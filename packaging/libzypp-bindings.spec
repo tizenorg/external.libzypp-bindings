@@ -13,7 +13,7 @@
 Name:           libzypp-bindings
 Version:        0.5.10
 Release:        1.3
-License:        GPL v2 or later
+License:        GPLv2+
 Summary:        Bindings for libzypp
 Group:          Development/Sources
 %if 0%{?suse_version}  
@@ -57,6 +57,8 @@ make -j1
 %install
 cd build
 make install DESTDIR=$RPM_BUILD_ROOT
+mkdir -p %{buildroot}/usr/share/license
+cp %{_builddir}/%{name}-%{version}/LICENSE %{buildroot}/usr/share/license/%{name}
 
 %clean
 
@@ -73,3 +75,4 @@ Python bindings of libzypp
 %defattr(-,root,root,-)
 %{python_sitearch}/_zypp.so
 %{python_sitearch}/zypp.py*
+/usr/share/license/%{name}
