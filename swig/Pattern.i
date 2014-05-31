@@ -1,0 +1,1 @@
+%include <zypp/Pattern.h>

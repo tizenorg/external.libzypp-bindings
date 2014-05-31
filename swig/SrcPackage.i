@@ -1,0 +1,1 @@
+%include <zypp/SrcPackage.h>;

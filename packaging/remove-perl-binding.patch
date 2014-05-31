@@ -1,0 +1,1885 @@
+diff --git a/swig/CMakeLists.txt b/swig/CMakeLists.txt
+index efa48c4..8b3bc62 100644
+--- a/swig/CMakeLists.txt
++++ b/swig/CMakeLists.txt
+@@ -11,19 +11,8 @@ SET( SWIG_INPUT "${CMAKE_CURRENT_SOURCE_DIR}/zypp.i" )
+ # Let's see which target languages are available
+ #
+ 
+-FIND_PACKAGE(Ruby)
+ FIND_PACKAGE(PythonLibs)
+-FIND_PACKAGE(Perl)
+ 
+-
+-IF (RUBY_LIBRARY AND RUBY_INCLUDE_PATH)
+-  ADD_SUBDIRECTORY(ruby)
+-ENDIF(RUBY_LIBRARY AND RUBY_INCLUDE_PATH)
+-    
+ IF (PYTHON_LIBRARY)
+   ADD_SUBDIRECTORY(python)
+ ENDIF(PYTHON_LIBRARY)
+-      
+-IF (PERL_EXECUTABLE)
+-  ADD_SUBDIRECTORY(perl5)
+-ENDIF (PERL_EXECUTABLE)
+diff --git a/swig/perl5/CMakeLists.txt b/swig/perl5/CMakeLists.txt
+deleted file mode 100644
+index df226a4..0000000
+--- a/swig/perl5/CMakeLists.txt
++++ /dev/null
+@@ -1,57 +0,0 @@
+-#
+-# CMakeLists.txt for libzypp-bindings/swig/perl5
+-#
+-# !!Attn!!: This creates two files
+-#  1. zypp.so
+-#  2. zypp.pm
+-# and the .pm file gets loaded.
+-#
+-
+-ENABLE_TESTING()
+-ADD_SUBDIRECTORY(tests)
+-
+-# SWIG_OUPUT is per-target
+-SET( SWIG_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libzypp_perl.cc" )
+-
+-EXECUTE_PROCESS(COMMAND ${PERL_EXECUTABLE} -e "use Config; print \$Config{cppflags}" OUTPUT_VARIABLE PERL_CXXFLAGS)
+-EXECUTE_PROCESS(COMMAND ${PERL_EXECUTABLE} -e "use Config; print \$Config{archlib}.\"/CORE\"" OUTPUT_VARIABLE PERL_CORE_DIR)
+-EXECUTE_PROCESS(COMMAND ${PERL_EXECUTABLE} -e "use Config; print \$Config{installvendorarch}" OUTPUT_VARIABLE PERL_VENDOR_ARCH)
+-EXECUTE_PROCESS(COMMAND ${PERL_EXECUTABLE} -e "use Config; print \$Config{installvendorlib}" OUTPUT_VARIABLE PERL_VENDOR_LIB)
+-EXECUTE_PROCESS(COMMAND ${PERL_EXECUTABLE} -e "use Config; print \$Config{ccdlflags}" OUTPUT_VARIABLE PERL_LINK_FLAGS)
+-
+-MESSAGE(STATUS "Perl executable: ${PERL_EXECUTABLE}")
+-MESSAGE(STATUS "Perl core dir: ${PERL_CORE_DIR}")
+-MESSAGE(STATUS "Perl vendor arch dir: ${PERL_VENDORDIR}")
+-
+-ADD_DEFINITIONS( ${PERL_CXXFLAGS} -Wno-unused -Wno-error )
+-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PERL_CXXFLAGS}")
+-
+-LINK_DIRECTORIES( ${PERL_CORE_DIR} )
+-
+-if(COMMAND cmake_policy)
+-  cmake_policy(SET CMP0003 NEW)
+-endif(COMMAND cmake_policy)
+-
+-ADD_CUSTOM_COMMAND (
+-   OUTPUT  ${SWIG_OUTPUT}
+-   COMMAND ${CMAKE_COMMAND} -E echo_append "Creating wrapper code for perl..."
+-   COMMAND ${SWIG_EXECUTABLE} ${SWIG_DEFINITIONS} -c++ -perl5 -o ${SWIG_OUTPUT} -I${ZYPP_INCLUDE_DIR} ${SWIG_INPUT}
+-   COMMAND ${CMAKE_COMMAND} -E echo "Done."
+-   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../*.i ${CMAKE_CURRENT_SOURCE_DIR}/../*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.i
+-)
+-
+-ADD_LIBRARY( zypp_perl SHARED ${SWIG_OUTPUT} )
+-SET_TARGET_PROPERTIES( zypp_perl
+-  PROPERTIES
+-    PREFIX ""
+-    OUTPUT_NAME zypp
+-)
+-
+-INCLUDE_DIRECTORIES( ${PERL_CORE_DIR} )
+-INCLUDE_DIRECTORIES( ${CMAKE_SOURCE_DIR}/swig )
+-INCLUDE_DIRECTORIES( ${ZYPP_INCLUDE_DIR} )
+-TARGET_LINK_LIBRARIES( zypp_perl ${ZYPP_LIBRARY} )
+-
+-INSTALL(TARGETS zypp_perl LIBRARY DESTINATION ${PERL_VENDOR_ARCH})
+-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/zypp.pm DESTINATION ${PERL_VENDOR_LIB})
+diff --git a/swig/perl5/perl.i b/swig/perl5/perl.i
+deleted file mode 100644
+index 8c60f30..0000000
+--- a/swig/perl5/perl.i
++++ /dev/null
+@@ -1,91 +0,0 @@
+-
+-%ignore zypp::Arch_empty;
+-
+-namespace zypp
+-{
+-    // These operators must be ignored otherwise the wrapper does
+-    // not compile (using swig 1.3.29).
+-    %ignore operator<<;
+-    %ignore operator==;
+-    %ignore operator!=;
+-
+-    namespace filesystem
+-    {
+-	// Same as above.
+-	%ignore operator==;
+-	%ignore operator!=;
+-	%ignore operator<<;
+-    }
+-}
+-
+-%define iter(cls, storetype)
+-%extend cls {
+-   cls::const_iterator iterator_incr(cls::const_iterator *it){
+-      (*it)++;
+-      return *it;
+-   }
+-   cls::const_iterator iterator_decr(cls::const_iterator *it){
+-      (*it)--;
+-      return *it;
+-   }
+-   bool iterator_equal(cls::const_iterator it1, cls::const_iterator it2) {
+-      return (it1 == it2);
+-   }
+-   storetype iterator_value(cls::const_iterator it) {
+-      return (&**it);
+-   }
+-   cls::const_iterator cBegin() {
+-      return self->begin();
+-   }
+-   cls::const_iterator cEnd() {
+-      return self->end();
+-   }
+-};
+-%enddef
+-
+-%define iter2(cls, storetype)
+-%extend cls {
+-   cls::const_iterator iterator_incr(cls::const_iterator *it){
+-      ++(*it);
+-      return *it;
+-   }
+-   cls::const_iterator iterator_decr(cls::const_iterator *it){
+-      --(*it);
+-      return *it;
+-   }
+-   bool iterator_equal(cls::const_iterator it1, cls::const_iterator it2) {
+-      return (it1 == it2);
+-   }
+-   storetype iterator_value(cls::const_iterator it) {
+-      return (*it);
+-   }
+-   cls::const_iterator cBegin() {
+-      return self->begin();
+-   }
+-   cls::const_iterator cEnd() {
+-      return self->end();
+-   }
+-};
+-%enddef
+-
+-// no operator--
+-%define forwarditer(cls, storetype)
+-%extend cls {
+-   cls::const_iterator iterator_incr(cls::const_iterator *it){
+-      ++(*it);
+-      return *it;
+-   }
+-   bool iterator_equal(cls::const_iterator it1, cls::const_iterator it2) {
+-      return (it1 == it2);
+-   }
+-   storetype iterator_value(cls::const_iterator it) {
+-      return (*it);
+-   }
+-   cls::const_iterator cBegin() {
+-      return self->begin();
+-   }
+-   cls::const_iterator cEnd() {
+-      return self->end();
+-   }
+-};
+-%enddef
+diff --git a/swig/perl5/tests/CMakeLists.txt b/swig/perl5/tests/CMakeLists.txt
+deleted file mode 100644
+index af6e7a7..0000000
+--- a/swig/perl5/tests/CMakeLists.txt
++++ /dev/null
+@@ -1,8 +0,0 @@
+-#
+-# CMakeLists.txt for libzypp-bindings/swig/perl5/tests
+-#
+-
+-ENABLE_TESTING()
+-
+-ADD_TEST(bindings_perl_loading perl ${CMAKE_CURRENT_SOURCE_DIR}/loading.pl)
+-ADD_TEST(bindings_perl_starting perl ${CMAKE_CURRENT_SOURCE_DIR}/starting.pl)
+diff --git a/swig/perl5/tests/loading.pl b/swig/perl5/tests/loading.pl
+deleted file mode 100644
+index 0f45c2d..0000000
+--- a/swig/perl5/tests/loading.pl
++++ /dev/null
+@@ -1,7 +0,0 @@
+-#!/usr/bin/perl
+-
+-use FindBin qw($Bin);
+-use lib "$Bin/../../../build/swig/perl5";
+-
+-use zypp;
+-
+diff --git a/swig/perl5/tests/starting.pl b/swig/perl5/tests/starting.pl
+deleted file mode 100644
+index 09d3954..0000000
+--- a/swig/perl5/tests/starting.pl
++++ /dev/null
+@@ -1,9 +0,0 @@
+-#!/usr/bin/perl
+-
+-use FindBin qw($Bin);
+-use lib "$Bin/../../../build/swig/perl5";
+-
+-use zypp;
+-
+-$zfactory = zyppc::ZYppFactory_instance();
+-$zypp = $zfactory->getZYpp;
+diff --git a/swig/ruby/CMakeLists.txt b/swig/ruby/CMakeLists.txt
+deleted file mode 100644
+index 08d6329..0000000
+--- a/swig/ruby/CMakeLists.txt
++++ /dev/null
+@@ -1,62 +0,0 @@
+-#
+-# CMakeLists.txt for libzypp-bindings/swig/ruby
+-#
+-
+-ENABLE_TESTING()
+-ADD_SUBDIRECTORY(tests)
+-
+-# SWIG_OUPUT is per-target
+-
+-SET( SWIG_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/libzypp_ruby.cc" )
+-
+-MESSAGE(STATUS "Ruby executable: ${RUBY_EXECUTABLE}")
+-MESSAGE(STATUS "Ruby vendor arch dir: ${RUBY_VENDORARCH_DIR}")
+-MESSAGE(STATUS "Ruby include path: ${RUBY_INCLUDE_PATH}")
+-
+-ADD_CUSTOM_COMMAND (
+-   OUTPUT  "${SWIG_OUTPUT}"
+-   COMMAND ${CMAKE_COMMAND} -E echo_append "Creating wrapper code for Ruby..."
+-   COMMAND ${SWIG_EXECUTABLE} ${SWIG_DEFINITIONS} -c++ -ruby -o ${SWIG_OUTPUT} -I${ZYPP_INCLUDE_DIR} ${SWIG_INPUT}
+-   COMMAND ${CMAKE_COMMAND} -E echo "Done."
+-   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../*.i ${CMAKE_CURRENT_SOURCE_DIR}/../*.h ${CMAKE_CURRENT_SOURCE_DIR}/*.i
+-)
+-
+-ADD_LIBRARY( zypp_ruby SHARED ${SWIG_OUTPUT} )
+-
+-# name it 'zypp.so'
+-#  and don't prefix with 'lib'
+-SET_TARGET_PROPERTIES( zypp_ruby PROPERTIES OUTPUT_NAME "zypp" PREFIX "" )
+-
+-INCLUDE_DIRECTORIES( ${RUBY_INCLUDE_PATH} )
+-INCLUDE_DIRECTORIES( ${CMAKE_SOURCE_DIR}/swig )
+-INCLUDE_DIRECTORIES( ${ZYPP_INCLUDE_DIR} )
+-
+-TARGET_LINK_LIBRARIES( zypp_ruby ${RUBY_LIBRARY} )
+-TARGET_LINK_LIBRARIES( zypp_ruby ${ZYPP_LIBRARY} )
+-
+-INSTALL(TARGETS zypp_ruby LIBRARY DESTINATION ${RUBY_VENDORARCH_DIR})
+-
+-#
+-# Generate HTML documentation with rdoc
+-#
+-# This requires rdoc-swig from https://github.com/kkaempf/rdoc-swig
+-#
+-
+-IF(EXISTS ${CMAKE_SOURCE_DIR}/swig/ruby/rdoc)
+-SET(rdoc_dir "${CMAKE_CURRENT_BINARY_DIR}/html")
+-ADD_CUSTOM_COMMAND (
+-   OUTPUT ${rdoc_dir}
+-   COMMAND ${CMAKE_COMMAND} -E echo_append "Creating rdoc documentation ..."
+-   COMMAND rm -rf ${rdoc_dir}
+-   COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/rdoc -o ${rdoc_dir} zypp.i *.i ruby/*.i
+-   COMMAND ${CMAKE_COMMAND} -E echo "Done."
+-   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/swig
+-   DEPENDS ${CMAKE_SOURCE_DIR}/swig/*.i ${CMAKE_SOURCE_DIR}/swig/ruby/*.rb ${CMAKE_SOURCE_DIR}/swig/ruby/*.i
+-)
+-ADD_CUSTOM_TARGET(ruby_rdoc ALL DEPENDS "${rdoc_dir}")
+-ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/swig/ruby/rdoc)
+-
+-#
+-# Leave this to %doc in the .spec file
+-#INSTALL(DIRECTORY "${rdoc_dir}" DESTINATION ${DOC_INSTALL_DIR})
+diff --git a/swig/ruby/ruby.i b/swig/ruby/ruby.i
+deleted file mode 100644
+index d2d3025..0000000
+--- a/swig/ruby/ruby.i
++++ /dev/null
+@@ -1,125 +0,0 @@
+-
+-%rename *::asString "to_s";
+-
+-namespace zypp
+-{
+-    // Not ignoring gives a very strange error in the "pokus" testsuite: SWIG
+-    // defines a Ruby module-function "==" which (when included into the main
+-    // namespace) is apparently used where is should not.
+-    %ignore operator==;
+-
+-    // Just to avoid warnings.
+-    %ignore operator!=;
+-    %ignore operator<<;
+-
+-    namespace filesystem
+-    {
+-	// Same as above.
+-	%ignore operator==;
+-	%ignore operator!=;
+-	%ignore operator<<;
+-    }
+-
+-}
+-
+-/*
+- *  Extend cls with an ruby-like each iterator and a to_a method.  Yields
+- *  objects of type storetype.  Parameter storetype must be a pointer type.
+- */
+-#define iter2(cls, storetype) \
+-%mixin cls "Enumerable"; \
+-%extend cls \
+-{ \
+-    void each() { \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const storetype tmp = &**i; \
+-	    rb_yield(SWIG_NewPointerObj((void*) tmp, $descriptor(storetype), 0)); \
+-            i++; \
+-        } \
+-    } \
+-\
+-    VALUE to_a() { \
+-        VALUE ary = rb_ary_new(); \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const storetype tmp = &**i; \
+-            rb_ary_push(ary, SWIG_NewPointerObj((void*) tmp, $descriptor(storetype), 0)); \
+-            i++; \
+-        } \
+-        return ary; \
+-    } \
+-}
+-
+-
+-/*
+- *  Like iter2, but does only one dereferencing from the iterator.
+- */
+-#define iter3(cls, storetype) \
+-%mixin cls "Enumerable"; \
+-%extend cls \
+-{ \
+-    void each() { \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const storetype tmp = &*i; \
+-	    rb_yield(SWIG_NewPointerObj((void*) tmp, $descriptor(storetype), 0)); \
+-            i++; \
+-        } \
+-    } \
+-\
+-    VALUE to_a() { \
+-        VALUE ary = rb_ary_new(); \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const storetype tmp = &*i; \
+-            rb_ary_push(ary, SWIG_NewPointerObj((void*) tmp, $descriptor(storetype), 0)); \
+-            i++; \
+-        } \
+-        return ary; \
+-    } \
+-}
+-
+-/*
+- *  This is for an iterator whichs operator* returns by value (i.e. a temporary).
+- *  Like e.g. the Capabilities::const_iterator does. If the compiler warns you are
+- *  taking the address of a temporary when using iter3, you most probaly need this one.
+- *
+- */
+-#define by_value_iterator(cls) \
+-%mixin cls "Enumerable"; \
+-%extend cls \
+-{ \
+-    void each() { \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const cls::value_type* tmp = new cls::value_type( *i ); \
+-	    rb_yield(SWIG_NewPointerObj((void*) tmp, $descriptor(cls::value_type*), 1)); \
+-            i++; \
+-        } \
+-    } \
+-\
+-    VALUE to_a() { \
+-        VALUE ary = rb_ary_new(); \
+-	cls::const_iterator i = self->begin(); \
+-        while (i != self->end()) { \
+-	    const cls::value_type* tmp = new cls::value_type( *i ); \
+-            rb_ary_push(ary, SWIG_NewPointerObj((void*) tmp, $descriptor(cls::value_type*), 1)); \
+-            i++; \
+-        } \
+-        return ary; \
+-    } \
+-}
+-
+-%exception
+-{
+-  try {
+-    $action
+-  }
+-  catch (const Exception& e) {
+-    static VALUE zyppexception = rb_define_class("ZYppException", rb_eStandardError);
+-    std::string tmp = e.historyAsString() + e.asUserString();
+-    rb_raise(zyppexception, tmp.c_str());
+-  }
+-}
+-
+diff --git a/swig/ruby/std_list.i b/swig/ruby/std_list.i
+deleted file mode 100644
+index f6d36e6..0000000
+--- a/swig/ruby/std_list.i
++++ /dev/null
+@@ -1,533 +0,0 @@
+-/* -----------------------------------------------------------------------------
+- * See the LICENSE file for information on copyright, usage and redistribution
+- * of SWIG, and the README file for authors - http://www.swig.org/release.html.
+- *
+- * std_list.i
+- *
+- * SWIG typemaps for std::list
+- * ----------------------------------------------------------------------------- */
+-
+-%include <std_common.i>
+-
+-// ------------------------------------------------------------------------
+-// std::list
+-// 
+-// The aim of all that follows would be to integrate std::list with 
+-// Ruby as much as possible, namely, to allow the user to pass and 
+-// be returned Ruby arrays
+-// const declarations are used to guess the intent of the function being
+-// exported; therefore, the following rationale is applied:
+-// 
+-//   -- f(std::list<T>), f(const std::list<T>&), f(const std::list<T>*):
+-//      the parameter being read-only, either a Ruby array or a
+-//      previously wrapped std::list<T> can be passed.
+-//   -- f(std::list<T>&), f(std::list<T>*):
+-//      the parameter must be modified; therefore, only a wrapped std::list
+-//      can be passed.
+-//   -- std::list<T> f():
+-//      the list is returned by copy; therefore, a Ruby array of T:s 
+-//      is returned which is most easily used in other Ruby functions
+-//   -- std::list<T>& f(), std::list<T>* f(), const std::list<T>& f(),
+-//      const std::list<T>* f():
+-//      the list is returned by reference; therefore, a wrapped std::list
+-//      is returned
+-// ------------------------------------------------------------------------
+-
+-%{
+-#include <list>
+-#include <algorithm>
+-#include <stdexcept>
+-%}
+-
+-// exported class
+-
+-namespace std {
+-
+-    %mixin list "Enumerable";
+-
+-    template<class T> class list {
+-        %typemap(in) list<T> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-		    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    $1.push_back(*x);
+-                }
+-            } else {
+-	        void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const list<T>& (std::list<T> temp),
+-                     const list<T>* (std::list<T> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    temp.push_back(*x);
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        
+-        void each() {
+-                for ( std::list<T>::const_iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        
+-        
+-        %typemap(out) list<T> {
+-            $result = rb_ary_new2($1.size());
+-            unsigned int i = 0;
+-            for ( std::list<T>::iterator it = $1.begin();
+-                  it != $1.end();
+-                  ++it )
+-            {
+-                T* x = new T((*it));
+-                rb_ary_store($result,i,
+-                             SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 1));
+-                ++i;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) list<T> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const list<T>&,
+-                                          const list<T>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        list();
+-        list(unsigned int size);
+-        list(unsigned int size, const T& value);
+-        list(const list<T> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) push_back;
+-        void push_back(const T& x);
+-        %extend {
+-            /*
+-            T pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty list");
+-                T x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T& __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            void __setitem__(int i, const T& x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::list<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-
+-    // Partial specialization for lists of pointers.  [ beazley ]
+-
+-    %mixin list<T*> "Enumerable";
+-    template<class T> class list<T*> {
+-        %typemap(in) list<T*> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = std::list<T* >(size);
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    (($1_type &)$1)[i] = x;
+-                }
+-            } else {
+-                void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const list<T*>& (std::list<T*> temp),
+-                     const list<T*>* (std::list<T*> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                temp = std::list<T* >(size);
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    temp[i] = x;
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        %typemap(out) list<T*> {
+-            $result = rb_ary_new2($1.size());
+-            for (unsigned int i=0; i<$1.size(); i++) {
+-                T* x = (($1_type &)$1)[i];
+-                rb_ary_store($result,i,
+-                             SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) list<T*> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T* >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const list<T*>&,
+-                                          const list<T*>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T* >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        list();
+-        list(unsigned int size);
+-        list(unsigned int size, T * &value);
+-        list(const list<T*> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) push_back;
+-        void push_back(T* x);
+-        %extend {
+-            /*
+-            T* pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty list");
+-                T* x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T* __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            void __setitem__(int i, T* x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::list<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-        
+-
+-    // specializations for built-ins
+-
+-    %define specialize_std_list(T,CHECK,CONVERT_FROM,CONVERT_TO)
+-    %mixin list<T> "Enumerable";
+-    template<> class list<T> {
+-        %typemap(in) list<T> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = std::list<T >(size);
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    if (CHECK(o))
+-                        (($1_type &)$1)[i] = (T)(CONVERT_FROM(o));
+-                    else
+-                        rb_raise(rb_eTypeError,
+-                                 "wrong argument type"
+-                                 " (expected list<" #T ">)");
+-                }
+-            } else {
+-	        void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const list<T>& (std::list<T> temp),
+-                     const list<T>* (std::list<T> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                temp = std::list<T >(size);
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    if (CHECK(o))
+-                        temp[i] = (T)(CONVERT_FROM(o));
+-                    else
+-                        rb_raise(rb_eTypeError,
+-                                 "wrong argument type"
+-                                 " (expected list<" #T ">)");
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        %typemap(out) list<T> {
+-            $result = rb_ary_new2($1.size());
+-            for (unsigned int i=0; i<$1.size(); i++)
+-                rb_ary_store($result,i,CONVERT_TO((($1_type &)$1)[i]));
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) list<T> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if (CHECK(o))
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const list<T>&,
+-                                          const list<T>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if (CHECK(o))
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped list? */
+-                std::list<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        list();
+-        list(unsigned int size);
+-        list(unsigned int size, const T& value);
+-        list(const list<T> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) push_back;
+-        void push_back(T x);
+-        %extend {
+-            /*
+-            T pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty list");
+-                T x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            void __setitem__(int i, T x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("list index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::list<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-    %enddef
+-
+-    specialize_std_list(bool,SWIG_BOOL_P,SWIG_RB2BOOL,SWIG_BOOL2RB);
+-    specialize_std_list(char,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(int,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(short,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(long,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(unsigned char,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(unsigned int,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(unsigned short,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(unsigned long,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_list(double,SWIG_FLOAT_P,SWIG_NUM2DBL,rb_float_new);
+-    specialize_std_list(float,SWIG_FLOAT_P,SWIG_NUM2DBL,rb_float_new);
+-    specialize_std_list(std::string,SWIG_STRING_P,SWIG_RB2STR,SWIG_STR2RB);
+-
+-}
+-
+diff --git a/swig/ruby/std_set.i b/swig/ruby/std_set.i
+deleted file mode 100644
+index af2a146..0000000
+--- a/swig/ruby/std_set.i
++++ /dev/null
+@@ -1,527 +0,0 @@
+-/* -----------------------------------------------------------------------------
+- * See the LICENSE file for information on copyright, usage and redistribution
+- * of SWIG, and the README file for authors - http://www.swig.org/release.html.
+- *
+- * std_set.i
+- *
+- * SWIG typemaps for std::set
+- * ----------------------------------------------------------------------------- */
+-
+-%include <std_common.i>
+-
+-// ------------------------------------------------------------------------
+-// std::set
+-// 
+-// The aim of all that follows would be to integrate std::set with 
+-// Ruby as much as possible, namely, to allow the user to pass and 
+-// be returned Ruby arrays
+-// const declarations are used to guess the intent of the function being
+-// exported; therefore, the following rationale is applied:
+-// 
+-//   -- f(std::set<T>), f(const std::set<T>&), f(const std::set<T>*):
+-//      the parameter being read-only, either a Ruby array or a
+-//      previously wrapped std::set<T> can be passed.
+-//   -- f(std::set<T>&), f(std::set<T>*):
+-//      the parameter must be modified; therefore, only a wrapped std::set
+-//      can be passed.
+-//   -- std::set<T> f():
+-//      the set is returned by copy; therefore, a Ruby array of T:s 
+-//      is returned which is most easily used in other Ruby functions
+-//   -- std::set<T>& f(), std::set<T>* f(), const std::set<T>& f(),
+-//      const std::set<T>* f():
+-//      the set is returned by reference; therefore, a wrapped std::set
+-//      is returned
+-// ------------------------------------------------------------------------
+-
+-%{
+-#include <set>
+-#include <algorithm>
+-#include <stdexcept>
+-%}
+-
+-// exported class
+-
+-namespace std {
+-
+-    %mixin set "Enumerable";
+-
+-    template<class T> class set {
+-        %typemap(in) set<T> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-		    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    $1.insert(*x);
+-                }
+-            } else {
+-	        void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const set<T>& (std::set<T> temp),
+-                     const set<T>* (std::set<T> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    temp.insert(*x);
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        
+-        void each() {
+-                for ( std::set<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = (T *) &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        
+-        
+-        %typemap(out) set<T> {
+-            $result = rb_ary_new2($1.size());
+-            unsigned int i = 0;
+-            for ( std::set<T>::iterator it = $1.begin();
+-                  it != $1.end();
+-                  ++it )
+-            {
+-                T* x = new T((*it));
+-                rb_ary_store($result,i,
+-                             SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 1));
+-                ++i;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) set<T> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const set<T>&,
+-                                          const set<T>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        set();
+-        set(const set<T> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) insert;
+-        void insert(const T& x);
+-        %extend {
+-            /*
+-            T pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty set");
+-                T x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T& __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            void __setitem__(int i, const T& x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::set<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = (T *)&(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-
+-    // Partial specialization for sets of pointers.  [ beazley ]
+-
+-    %mixin set<T*> "Enumerable";
+-    template<class T> class set<T*> {
+-        %typemap(in) set<T*> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = std::set<T* >(size);
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    (($1_type &)$1)[i] = x;
+-                }
+-            } else {
+-                void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const set<T*>& (std::set<T*> temp),
+-                     const set<T*>* (std::set<T*> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                temp = std::set<T* >(size);
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    T* x;
+-                    SWIG_ConvertPtr(o, (void **) &x, $descriptor(T *), 1);
+-                    temp[i] = x;
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        %typemap(out) set<T*> {
+-            $result = rb_ary_new2($1.size());
+-            for (unsigned int i=0; i<$1.size(); i++) {
+-                T* x = (($1_type &)$1)[i];
+-                rb_ary_store($result,i,
+-                             SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) set<T*> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T* >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const set<T*>&,
+-                                          const set<T*>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    T* x;
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if ((SWIG_ConvertPtr(o,(void **) &x, 
+-                                         $descriptor(T *),0)) != -1)
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T* >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        set();
+-        set(const set<T*> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) insert;
+-        void insert(T* x);
+-        %extend {
+-            /*
+-            T* pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty set");
+-                T* x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T* __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            void __setitem__(int i, T* x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::set<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = (T*) &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-        
+-
+-    // specializations for built-ins
+-
+-    %define specialize_std_set(T,CHECK,CONVERT_FROM,CONVERT_TO)
+-    %mixin set<T> "Enumerable";
+-    template<> class set<T> {
+-        %typemap(in) set<T> {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                $1 = std::set<T >(size);
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    if (CHECK(o))
+-                        (($1_type &)$1)[i] = (T)(CONVERT_FROM(o));
+-                    else
+-                        rb_raise(rb_eTypeError,
+-                                 "wrong argument type"
+-                                 " (expected set<" #T ">)");
+-                }
+-            } else {
+-	        void *ptr;
+-                SWIG_ConvertPtr($input, &ptr, $&1_descriptor, 1);
+-                $1 = *(($&1_type) ptr);
+-            }
+-        }
+-        %typemap(in) const set<T>& (std::set<T> temp),
+-                     const set<T>* (std::set<T> temp) {
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                temp = std::set<T >(size);
+-                $1 = &temp;
+-                for (unsigned int i=0; i<size; i++) {
+-                    VALUE o = RARRAY($input)->ptr[i];
+-                    if (CHECK(o))
+-                        temp[i] = (T)(CONVERT_FROM(o));
+-                    else
+-                        rb_raise(rb_eTypeError,
+-                                 "wrong argument type"
+-                                 " (expected set<" #T ">)");
+-                }
+-            } else {
+-                SWIG_ConvertPtr($input, (void **) &$1, $1_descriptor, 1);
+-            }
+-        }
+-        %typemap(out) set<T> {
+-            $result = rb_ary_new2($1.size());
+-            for (unsigned int i=0; i<$1.size(); i++)
+-                rb_ary_store($result,i,CONVERT_TO((($1_type &)$1)[i]));
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) set<T> {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if (CHECK(o))
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $&1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-        %typecheck(SWIG_TYPECHECK_VECTOR) const set<T>&,
+-                                          const set<T>* {
+-            /* native sequence? */
+-            if (rb_obj_is_kind_of($input,rb_cArray)) {
+-                unsigned int size = RARRAY($input)->len;
+-                if (size == 0) {
+-                    /* an empty sequence can be of any type */
+-                    $1 = 1;
+-                } else {
+-                    /* check the first element only */
+-                    VALUE o = RARRAY($input)->ptr[0];
+-                    if (CHECK(o))
+-                        $1 = 1;
+-                    else
+-                        $1 = 0;
+-                }
+-            } else {
+-                /* wrapped set? */
+-                std::set<T >* v;
+-                if (SWIG_ConvertPtr($input,(void **) &v, 
+-                                    $1_descriptor,0) != -1)
+-                    $1 = 1;
+-                else
+-                    $1 = 0;
+-            }
+-        }
+-      public:
+-        set();
+-        set(const set<T> &);
+-
+-        %rename(__len__) size;
+-        unsigned int size() const;
+-        %rename("empty?") empty;
+-        bool empty() const;
+-        void clear();
+-        %rename(push) insert;
+-        void insert(T x);
+-        %extend {
+-            /*
+-            T pop() throw (std::out_of_range) {
+-                if (self->size() == 0)
+-                    throw std::out_of_range("pop from empty set");
+-                T x = self->back();
+-                self->pop_back();
+-                return x;
+-            }
+-            T __getitem__(int i) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i += size;
+-                if (i>=0 && i<size)
+-                    return (*self)[i];
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            void __setitem__(int i, T x) throw (std::out_of_range) {
+-                int size = int(self->size());
+-                if (i<0) i+= size;
+-                if (i>=0 && i<size)
+-                    (*self)[i] = x;
+-                else
+-                    throw std::out_of_range("set index out of range");
+-            }
+-            */
+-            void each() {
+-                for ( std::set<T>::iterator it = self->begin();
+-                      it != self->end();
+-                      ++it )
+-                {
+-                  T* x = &(*it);
+-                    rb_yield(SWIG_NewPointerObj((void *) x, 
+-                                                $descriptor(T *), 0));
+-                }
+-            }
+-        }
+-    };
+-    %enddef
+-
+-    specialize_std_set(bool,SWIG_BOOL_P,SWIG_RB2BOOL,SWIG_BOOL2RB);
+-    specialize_std_set(char,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(int,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(short,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(long,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(unsigned char,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(unsigned int,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(unsigned short,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(unsigned long,FIXNUM_P,FIX2INT,INT2NUM);
+-    specialize_std_set(double,SWIG_FLOAT_P,SWIG_NUM2DBL,rb_float_new);
+-    specialize_std_set(float,SWIG_FLOAT_P,SWIG_NUM2DBL,rb_float_new);
+-    specialize_std_set(std::string,SWIG_STRING_P,SWIG_RB2STR,SWIG_STR2RB);
+-
+-}
+-
+diff --git a/swig/ruby/tests/CMakeLists.txt b/swig/ruby/tests/CMakeLists.txt
+deleted file mode 100644
+index 3b084df..0000000
+--- a/swig/ruby/tests/CMakeLists.txt
++++ /dev/null
+@@ -1,11 +0,0 @@
+-#
+-# CMakeLists.txt for libzypp-bindings/swig/ruby/tests
+-#
+-
+-ENABLE_TESTING()
+-
+-ADD_TEST(bindings_ruby_loading      ruby -C ${CMAKE_CURRENT_SOURCE_DIR} loading.rb)
+-ADD_TEST(bindings_ruby_arch.rb      ruby -C ${CMAKE_CURRENT_SOURCE_DIR} arch.rb)
+-ADD_TEST(bindings_ruby_bytecount.rb ruby -C ${CMAKE_CURRENT_SOURCE_DIR} bytecount.rb)
+-ADD_TEST(bindings_ruby_starting.rb  ruby -C ${CMAKE_CURRENT_SOURCE_DIR} starting.rb)
+-ADD_TEST(bindings_ruby_target.rb    ruby -C ${CMAKE_CURRENT_SOURCE_DIR} target.rb)
+diff --git a/swig/ruby/tests/arch.rb b/swig/ruby/tests/arch.rb
+deleted file mode 100644
+index 3e2f508..0000000
+--- a/swig/ruby/tests/arch.rb
++++ /dev/null
+@@ -1,55 +0,0 @@
+-#
+-# Arch
+-#
+-
+-$:.unshift File.expand_path(File.join(File.dirname(__FILE__),"..","..","..","build","swig","ruby"))
+-
+-require 'test/unit'
+-require 'zypp'
+-
+-class Zypp::Arch
+-  include Comparable
+-end
+-
+-class ArchTest < Test::Unit::TestCase
+-  include Zypp
+-  def test_arch
+-    # define i386, a builtin
+-    
+-    a = Arch.new("i386")
+-    assert a
+-    assert_equal "i386", a.to_s
+-    assert_equal true, a.is_builtin
+-    
+-    # i486 is 'bigger' than i386
+-    
+-    b = Arch.new("i486")
+-    assert b
+-    assert_equal "i486", b.to_s
+-    assert b.is_builtin
+-    if VERSION > 800
+-      assert_equal a, b.base_arch
+-    end
+-    assert a < b
+-    assert a.compatible_with?(b)
+-
+-    # A new, adventurous architecture
+-    z = Arch.new("xyzzy")
+-    assert z
+-    assert_equal "xyzzy", z.to_s
+-    assert_equal false, z.is_builtin
+-    
+-    # predefined archs
+-    assert_equal Arch.new("noarch"), Arch.noarch 
+-    assert_equal a, Arch.i386
+-    assert_equal b, Arch.i486
+-    assert_equal Arch.new("i586"), Arch.i586
+-    assert_equal Arch.new("i686"), Arch.i686
+-    assert_equal Arch.new("x86_64"), Arch.x86_64
+-    assert_equal Arch.new("ia64"), Arch.ia64
+-    assert_equal Arch.new("ppc"), Arch.ppc
+-    assert_equal Arch.new("ppc64"), Arch.ppc64
+-    assert_equal Arch.new("s390"), Arch.s390
+-    assert_equal Arch.new("s390x"), Arch.s390x
+-  end
+-end
+diff --git a/swig/ruby/tests/bytecount.rb b/swig/ruby/tests/bytecount.rb
+deleted file mode 100644
+index 5b46e14..0000000
+--- a/swig/ruby/tests/bytecount.rb
++++ /dev/null
+@@ -1,25 +0,0 @@
+-#
+-# Test Bytecount
+-#
+-
+-$:.unshift "../../../build/swig/ruby"
+-
+-
+-# test loading of extension
+-require 'test/unit'
+-
+-class LoadTest < Test::Unit::TestCase
+-  require 'zypp'
+-  include Zypp
+-
+-  def test_bytecount
+-    g = ByteCount.new(ByteCount.G)
+-    assert g
+-    gb = ByteCount.new(ByteCount.GB)
+-    assert gb
+-    k = ByteCount.new(ByteCount.K)
+-    assert k.to_i == 1024
+-    mb = ByteCount.new(ByteCount.MB)
+-    assert mb.to_i == 1000*1000
+-  end
+-end
+diff --git a/swig/ruby/tests/commit_callbacks.rb b/swig/ruby/tests/commit_callbacks.rb
+deleted file mode 100644
+index 74767ce..0000000
+--- a/swig/ruby/tests/commit_callbacks.rb
++++ /dev/null
+@@ -1,46 +0,0 @@
+-#
+-# Test commit callbacks
+-#
+-
+-$:.unshift "../../../build/swig/ruby"
+-
+-
+-require 'test/unit'
+-require 'zypp'
+-
+-class CommitReceiver
+-  # Define class function, we pass the class (not an instance of the class)
+-  # to the CommitCallbacks
+-  def self.removal_start resolvable
+-    $stderr.puts "Starting to remove #{resolvable}"
+-  end
+-end
+-
+-class CommitCallbacksTest < Test::Unit::TestCase
+-  def test_removal_callback
+-    commit_callbacks = Zypp::CommitCallbacks.new
+-    assert_equal nil, commit_callbacks.receiver
+-    # In Ruby the class is also an object, so we connect to the class
+-    commit_callbacks.connect CommitReceiver
+-    assert_equal CommitReceiver, commit_callbacks.receiver
+-    
+-    z = Zypp::ZYppFactory::instance.getZYpp
+-
+-    z.initializeTarget(Zypp::Pathname.new("/"))
+-    t = z.target
+-    t.load
+-    t.buildCache
+-    
+-    emitter = Zypp::CommitCallbacksEmitter.new
+-    p = z.pool
+-    p.each do |item|
+-      puts "Emitting removal of ", item
+-      puts item.methods.inspect
+-      emitter.remove_start(item)
+-      break
+-    end						  
+-    
+-    commit_callbacks.disconnect
+-    assert_equal nil, commit_callbacks.receiver
+-  end
+-end
+diff --git a/swig/ruby/tests/loading.rb b/swig/ruby/tests/loading.rb
+deleted file mode 100644
+index 01ae25a..0000000
+--- a/swig/ruby/tests/loading.rb
++++ /dev/null
+@@ -1,16 +0,0 @@
+-#
+-# Test loading of the bindings
+-#
+-
+-$:.unshift "../../../build/swig/ruby"
+-
+-
+-# test loading of extension
+-require 'test/unit'
+-
+-class LoadTest < Test::Unit::TestCase
+-  def test_loading
+-    require 'zypp'
+-    assert true
+-  end
+-end
+diff --git a/swig/ruby/tests/starting.rb b/swig/ruby/tests/starting.rb
+deleted file mode 100644
+index 5f3afb2..0000000
+--- a/swig/ruby/tests/starting.rb
++++ /dev/null
+@@ -1,22 +0,0 @@
+-#
+-# Test starting of zypp
+-#
+-
+-$:.unshift "../../../build/swig/ruby"
+-
+-
+-# test loading of extension
+-require 'test/unit'
+-
+-class LoadTest < Test::Unit::TestCase
+-  def test_loading
+-    require 'zypp'
+-    zypp = Zypp::ZYppFactory::instance.getZYpp
+-    assert zypp
+-    zconfig = Zypp::ZConfig::instance
+-    assert zconfig
+-    puts zconfig.systemArchitecture
+-    zconfig.setSystemArchitecture(Zypp::Arch.new("i686"))
+-    puts zconfig.systemArchitecture
+-  end
+-end
+diff --git a/swig/ruby/tests/target.rb b/swig/ruby/tests/target.rb
+deleted file mode 100644
+index cfecfff..0000000
+--- a/swig/ruby/tests/target.rb
++++ /dev/null
+@@ -1,44 +0,0 @@
+-#
+-# Example for target
+-#
+-
+-$:.unshift "../../../build/swig/ruby"
+-
+-
+-# test loading of extension
+-require 'test/unit'
+-
+-class LoadTest < Test::Unit::TestCase
+-  require 'zypp'
+-  include Zypp
+-  def test_target
+-    z = ZYppFactory::instance.getZYpp
+-
+-    assert z.homePath
+-    assert z.tmpPath
+-
+-    z.initializeTarget(Zypp::Pathname.new("/"))
+-    t = z.target
+-    assert t
+-    t.load
+-    t.buildCache
+-    
+-    p = z.pool
+-    assert p
+-    assert p.size > 0
+-    
+-    # Iterate over pool, gives PoolItems
+-    i = 0
+-    puts "#{p.size} PoolItems:"
+-    p.each do | pi |
+-      i = i + 1
+-      break if i > 10
+-      puts pi
+-      # PoolItems have status and a resolvable
+-#      r = pi.resolvable
+-#      puts "#{r.name}-#{r.edition}"
+-    end
+-
+-    assert true
+-  end
+-end
+diff --git a/swig/zypp.i b/swig/zypp.i
+index 08d573b..c270d6c 100644
+--- a/swig/zypp.i
++++ b/swig/zypp.i
+@@ -5,25 +5,8 @@
+  */
+ #define PRODUCTION 1
+ 
+-#ifdef SWIGPERL5
+-%{
+-   #undef NORMAL
+-   #undef readdir
+-   #undef Fflush
+-   #undef Mkdir
+-   #undef strerror
+-%}
+-#endif
+-
+ %{
+ /* Includes the header in the wrapper code */
+-#ifdef SWIGRUBY
+-#define REG_EXTENDED 1
+-#define REG_ICASE (REG_EXTENDED << 1)
+-#define REG_NEWLINE (REG_ICASE << 1)
+-#define REG_NOSUB (REG_NEWLINE << 1)
+-#endif
+-
+ /*
+  * type definitions to keep the C code generic
+  */
+@@ -52,62 +35,6 @@
+ #define TARGET_THREAD_END_ALLOW SWIG_PYTHON_THREAD_END_ALLOW
+ #endif
+ 
+-#if defined(SWIGRUBY)
+-#define Target_Null_p(x) NIL_P(x)
+-#define Target_INCREF(x) 
+-#define Target_DECREF(x) 
+-#define Target_True Qtrue
+-#define Target_False Qfalse
+-#define Target_Null Qnil
+-#define Target_Type VALUE
+-#define Target_Bool(x) ((x)?Qtrue:Qfalse)
+-#define Target_WChar(x) INT2FIX(x)
+-#define Target_Int(x) INT2FIX(x)
+-#define Target_String(x) rb_str_new2(x)
+-#define Target_Real(x) rb_float_new(x)
+-#define Target_Array() rb_ary_new()
+-#define Target_SizedArray(len) rb_ary_new2(len)
+-#define Target_Append(x,y) rb_ary_push(x,y)
+-#define Target_DateTime(x) Qnil
+-#define TARGET_THREAD_BEGIN_BLOCK do {} while(0)
+-#define TARGET_THREAD_END_BLOCK do {} while(0)
+-#define TARGET_THREAD_BEGIN_ALLOW do {} while(0)
+-#define TARGET_THREAD_END_ALLOW do {} while(0)
+-#include <ruby.h>
+-#include <rubyio.h>
+-#endif
+-
+-#if defined(SWIGPERL)
+-#define TARGET_THREAD_BEGIN_BLOCK do {} while(0)
+-#define TARGET_THREAD_END_BLOCK do {} while(0)
+-#define TARGET_THREAD_BEGIN_ALLOW do {} while(0)
+-#define TARGET_THREAD_END_ALLOW do {} while(0)
+-
+-SWIGINTERNINLINE SV *SWIG_From_long  SWIG_PERL_DECL_ARGS_1(long value);
+-SWIGINTERNINLINE SV *SWIG_FromCharPtr(const char *cptr);
+-SWIGINTERNINLINE SV *SWIG_From_double  SWIG_PERL_DECL_ARGS_1(double value);
+-
+-#define Target_Null_p(x) (x == NULL)
+-#define Target_INCREF(x) 
+-#define Target_DECREF(x) 
+-#define Target_True (&PL_sv_yes)
+-#define Target_False (&PL_sv_no)
+-#define Target_Null NULL
+-#define Target_Type SV *
+-#define Target_Bool(x) (x)?Target_True:Target_False
+-#define Target_WChar(x) NULL
+-#define Target_Int(x) SWIG_From_long(x)
+-#define Target_String(x) SWIG_FromCharPtr(x)
+-#define Target_Real(x) SWIG_From_double(x)
+-#define Target_Array() (SV *)newAV()
+-#define Target_SizedArray(len) (SV *)newAV()
+-#define Target_Append(x,y) av_push(((AV *)(x)), y)
+-#define Target_DateTime(x) NULL
+-#include <perl.h>
+-#include <EXTERN.h>
+-#endif
+-
+-
+ #include <sstream>
+ #include "zypp/base/PtrTypes.h"
+ #include "zypp/base/ReferenceCounted.h"
+@@ -144,33 +71,15 @@ typedef std::list<std::string> StringList;
+ %}
+ 
+ /* prevent swig from creating a type called 'Target_Type' */
+-#if defined(SWIGRUBY)
+-#define Target_Type VALUE
+-#endif
+ #if defined(SWIGPYTHON)
+ #define Target_Type PyObject*
+ #endif
+-#if defined(SWIGPERL)
+-#define Target_Type SV *
+-#endif
+-
+-#ifdef SWIGRUBY
+-%include "ruby/std_list.i"
+-%include "ruby/std_set.i"
+-%include "ruby/ruby.i"
+-#endif
+-
+ #ifdef SWIGPYTHON
+ %include "std_list.i"
+ %include "std_set.i"
+ %include "python/python.i"
+ #endif
+ 
+-#ifdef SWIGPERL5
+-%include "std_list.i"
+-%include "perl5/perl.i"
+-#endif
+-
+ #define VERSION ZYPP_VERSION
+ 
+ /* These include files are pending to be cleaned up from C++ cruft */
