@@ -15,11 +15,20 @@ namespace zypp
       typedef zypp::intrusive_ptr<const _Res> constPtrType;
   };
 
-   typedef intrusive_ptr<const ResObject> ResObject_constPtr;
-   typedef intrusive_ptr<ResObject>       ResObject_Ptr;
-   %template(ResObject_constPtr)          intrusive_ptr<const zypp::ResObject>;
-   %template(ResObject_Ptr)               intrusive_ptr<zypp::ResObject>;
+   typedef ::zypp::intrusive_ptr<const ResObject> ResObject_constPtr;
+   typedef ::zypp::intrusive_ptr<ResObject>       ResObject_Ptr;
+   %template(ResObject_constPtr)          ::zypp::intrusive_ptr<const zypp::ResObject>;
+   %template(ResObject_Ptr)               ::zypp::intrusive_ptr<zypp::ResObject>;
 
+}
+
+namespace zypp::ResObject::TraitsType
+{
+  typedef ::zypp::intrusive_ptr<const zypp::ResObject> constPtrType;
+}
+namespace zypp::Resolvable::TraitsType
+{
+  typedef ::zypp::intrusive_ptr<const zypp::Resolvable> constPtrType;
 }
 
 %template(ResTraitsResolvable) zypp::ResTraits<zypp::Resolvable>;
@@ -34,15 +43,17 @@ namespace zypp
 %define %STUFF(X)
 namespace zypp
 {
-  typedef intrusive_ptr<const X> X##_constPtr;
-  typedef intrusive_ptr<X>       X##_Ptr;
-  %template(X##_constPtr)        intrusive_ptr<const X>;
-  %template(X##_Ptr)             intrusive_ptr<X>;
+  typedef ::zypp::intrusive_ptr<const X> X##_constPtr;
+  typedef ::zypp::intrusive_ptr<X>       X##_Ptr;
+  %template(X##_constPtr)        ::zypp::intrusive_ptr<const X>;
+  %template(X##_Ptr)             ::zypp::intrusive_ptr<X>;
 
   bool isKind##X( const zypp::Resolvable::constPtr & p );
+  bool isKind##X( const zypp::ResObject::constPtr & p );
   bool isKind##X( const zypp::PoolItem & p );
 
   X##_constPtr asKind##X( const zypp::Resolvable::constPtr & p );
+  X##_constPtr asKind##X( const zypp::ResObject::constPtr & p );
   X##_constPtr asKind##X( const zypp::PoolItem & p );
 }
 
@@ -52,9 +63,13 @@ namespace zypp
   {
     inline bool isKind##X( const zypp::Resolvable::constPtr & p )
     { return isKind<X>( p ); }
+    inline bool isKind##X( const zypp::ResObject::constPtr & p )
+    { return isKind<X>( p ); }
     inline bool isKind##X( const zypp::PoolItem & p )
     { return isKind<X>( p.resolvable() ); }
     inline X::constPtr asKind##X( const zypp::Resolvable::constPtr & p )
+    { return asKind<X>( p ); }
+    inline X::constPtr asKind##X( const zypp::ResObject::constPtr & p )
     { return asKind<X>( p ); }
     inline X::constPtr asKind##X( const zypp::PoolItem & p )
     { return asKind<X>( p.resolvable() ); }

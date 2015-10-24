@@ -15,6 +15,13 @@
 %}
 #endif
 
+// stuff swig seems to be unable to parse
+#define BOOST_NOEXCEPT
+#define BOOST_NO_CXX11_NOEXCEPT
+#define BOOST_NO_CXX11_RVALUE_REFERENCES
+#define BOOST_NO_CXX11_SMART_PTR
+#define constexpr
+
 %{
 /* Includes the header in the wrapper code */
 #ifdef SWIGRUBY
@@ -27,7 +34,7 @@
 /*
  * type definitions to keep the C code generic
  */
- 
+
 #if defined(SWIGPYTHON)
 #define Target_Null_p(x) (x == Py_None)
 #define Target_INCREF(x) Py_INCREF(x)
@@ -54,8 +61,8 @@
 
 #if defined(SWIGRUBY)
 #define Target_Null_p(x) NIL_P(x)
-#define Target_INCREF(x) 
-#define Target_DECREF(x) 
+#define Target_INCREF(x)
+#define Target_DECREF(x)
 #define Target_True Qtrue
 #define Target_False Qfalse
 #define Target_Null Qnil
@@ -74,7 +81,6 @@
 #define TARGET_THREAD_BEGIN_ALLOW do {} while(0)
 #define TARGET_THREAD_END_ALLOW do {} while(0)
 #include <ruby.h>
-#include <rubyio.h>
 #endif
 
 #if defined(SWIGPERL)
@@ -88,8 +94,8 @@ SWIGINTERNINLINE SV *SWIG_FromCharPtr(const char *cptr);
 SWIGINTERNINLINE SV *SWIG_From_double  SWIG_PERL_DECL_ARGS_1(double value);
 
 #define Target_Null_p(x) (x == NULL)
-#define Target_INCREF(x) 
-#define Target_DECREF(x) 
+#define Target_INCREF(x)
+#define Target_DECREF(x)
 #define Target_True (&PL_sv_yes)
 #define Target_False (&PL_sv_no)
 #define Target_Null NULL
@@ -109,6 +115,7 @@ SWIGINTERNINLINE SV *SWIG_From_double  SWIG_PERL_DECL_ARGS_1(double value);
 
 
 #include <sstream>
+#undef seed // don't know where it comes from, but it conflicts with <random>
 #include "zypp/base/PtrTypes.h"
 #include "zypp/base/ReferenceCounted.h"
 #include "zypp/Edition.h"
@@ -127,10 +134,13 @@ SWIGINTERNINLINE SV *SWIG_From_double  SWIG_PERL_DECL_ARGS_1(double value);
 #include "zypp/ServiceInfo.h"
 #include "zypp/RepoManager.h"
 #include "zypp/repo/RepoType.h"
+#include "zypp/repo/PackageProvider.h"
 #include "zypp/TmpPath.h"
 #include "zypp/Resolver.h"
-#include "zypp/pool/GetResolvablesToInsDel.h"
+#include "legacy/GetResolvablesToInsDel.h"
 
+#include "zypp/sat/SolvAttr.h"
+#include "zypp/PoolQuery.h"
 #include "zypp/Product.h"
 
 using namespace boost;
@@ -142,6 +152,9 @@ using namespace zypp::filesystem;
 typedef std::list<std::string> StringList;
 
 %}
+
+/* swig does not understand the __attribute__ extension */
+#define  __attribute__(x)
 
 /* prevent swig from creating a type called 'Target_Type' */
 #if defined(SWIGRUBY)
@@ -217,6 +230,7 @@ namespace zypp {
 %include "Kind.i"
 %include "CheckSum.i"
 %include "Date.i"
+%include "Changelog.i"
 %include "Dep.i"
 %include "Capability.i"
 %include "Capabilities.i"
@@ -224,17 +238,20 @@ namespace zypp {
 %include "OnMediaLocation.i"
 %include "Resolvable.i"
 %include "RepoType.i"
+%include "TmpPath.i"
 %include "RepoInfo.i"
+%include "Repository.i"
 %include "ServiceInfo.i"
 %include "ResTraits.i"
 %include "ResStatus.i"
 %include "ResObject.i"
+%include "VendorSupportOptions.i"
 %include "Package.i"
+%include "PackageProvider.i"
 %include "Patch.i"
 %include "Pattern.i"
 %include "Product.i"
 %include "SrcPackage.i"
-%include "Repository.i"
 %include "RepoStatus.i"
 %include "RepoManager.i"
 %include "PublicKey.i"
@@ -245,9 +262,14 @@ namespace zypp {
 %include "ResPool.i"
 %include "ZYppCommitPolicy.i"
 %include "ZYppCommitResult.i"
-%include "TmpPath.i"
 %include "Resolver.i"
 %include "ZConfig.i"
+%include "PoolQuery.i"
+%include "SolvAttr.i"
+
+//just simple files, where we need default ctor
+%include <zypp/repo/RepoProvideFile.h>
+%include <zypp/repo/DeltaCandidates.h>
 
 %ignore zypp::ZYpp::setTextLocale;
 %ignore zypp::ZYpp::getTextLocale;
